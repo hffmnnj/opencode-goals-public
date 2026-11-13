@@ -10,9 +10,10 @@ Run: python3 scripts/native-recovery.py [--case active_defer|no_progress|restart
        GOALS_PLUGIN_PATH=/path/to/project python3 scripts/native-recovery.py --case all
 
 Environment:
-  OPENCODE_V2_BIN   pinned 2.0.25 server binary (default: known release path).
-                    Never point this at the default `opencode` (V1) binary or
-                    the `opencodev2` live-config wrapper.
+  OPENCODE_V2_BIN   required pinned 2.0.25 server binary (no default; missing
+                    values fail before any server starts). Never point this at
+                    the default `opencode` (V1) binary or the `opencodev2`
+                    live-config wrapper.
   GOALS_PLUGIN_PATH override the plugin/project directory under test (default: repo root).
   GOALS_RECOVERY_ROOT override the artifact root.
 """
@@ -25,6 +26,7 @@ import pathlib
 import select
 import socket
 import subprocess
+import tempfile
 import threading
 import time
 import urllib.request
@@ -33,7 +35,6 @@ import urllib.parse
 import uuid
 
 PINNED_VERSION = '2.0.25'
-PINNED_BINARY = '/home/example/.local/share/opencode-v2-cli/releases/2.0.25/node_modules/@opencode/cli/bin/opencode.exe'
 DEFAULT_PROJECT = pathlib.Path(__file__).resolve().parent.parent
 INITIAL_NOPROGRESS_EVIDENCE = 'Initial native verification evidence for no-progress hold'
 RESTART_EVIDENCE = {'summary': 'Restart recovery verification evidence', 'reference': 'local:native-restart-recovery'}
@@ -46,7 +47,9 @@ parser.add_argument('--project', default=None, help='Override GOALS_PLUGIN_PATH'
 options = parser.parse_args()
 
 def resolve_binary():
-    binary = options.binary or os.environ.get('OPENCODE_V2_BIN') or PINNED_BINARY
+    binary = (options.binary or os.environ.get('OPENCODE_V2_BIN') or '').strip()
+    if not binary:
+        raise RuntimeError(f'Set OPENCODE_V2_BIN to the pinned V2 {PINNED_VERSION} release binary; refusing to run acceptance')
     if pathlib.Path(binary).name == 'opencodev2':
         raise RuntimeError('Refusing to spawn from the live-config wrapper; set OPENCODE_V2_BIN to the pinned 2.0.25 release binary')
     try:
@@ -60,7 +63,8 @@ def resolve_binary():
 
 BINARY = resolve_binary()
 PROJECT = pathlib.Path(options.project or os.environ.get('GOALS_PLUGIN_PATH') or str(DEFAULT_PROJECT))
-ROOT = pathlib.Path(options.artifact_root or os.environ.get('GOALS_RECOVERY_ROOT') or ('/var/tmp/example/opencode/goals-native-recovery-' + uuid.uuid4().hex))
+ROOT = pathlib.Path(options.artifact_root or os.environ.get('GOALS_RECOVERY_ROOT') or
+                    pathlib.Path(tempfile.gettempdir()) / ('goals-native-recovery-' + uuid.uuid4().hex))
 for name in ['home', 'config', 'data', 'cache', 'state', 'workspace', 'plugin']:
     (ROOT / name).mkdir(parents=True, exist_ok=True)
 

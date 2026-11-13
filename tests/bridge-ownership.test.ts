@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { mkdtemp, readdir, readFile, writeFile, mkdir } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { LoopbackBridge, USER_AGENT } from "../src/bridge.ts";
@@ -9,6 +10,8 @@ import { acquireOwner } from "../src/ownership.ts";
 const api = { baseURL: "http://127.0.0.1:4108", usernameEnv: "TEST_USER", passwordEnv: "TEST_PASSWORD" };
 const credentials = { TEST_USER: "fixture-user", TEST_PASSWORD: "fixture-password-not-a-real-secret" };
 const ownConfiguredListener = { listeners: () => [api.baseURL], managedService: () => undefined };
+// Child processes must resolve the real ownership module regardless of the checkout location.
+const ownershipModuleURL = new URL("../src/ownership.ts", import.meta.url).href;
 function transport(handler: (url: URL, init: RequestInit) => Response | Promise<Response>): typeof fetch {
   return (async (input: string | URL | Request, init?: RequestInit) => handler(new URL(input instanceof Request ? input.url : input), init ?? {})) as typeof fetch;
 }
@@ -308,7 +311,7 @@ describe("same-server bridge", () => {
 
 describe("real filesystem cooperative ownership", () => {
   async function paths() {
-    const state = await mkdtemp("/var/tmp/example/opencode/goals-owner-test-");
+    const state = await mkdtemp(join(tmpdir(), "goals-owner-test-"));
     const directory = join(state, "opencode-goals", "owners");
     await mkdir(directory, { recursive: true, mode: 0o700 });
     const lock = join(directory, `${createHash("sha256").update(JSON.stringify(["/project", ""])).digest("hex")}.lock`);
@@ -337,7 +340,7 @@ describe("real filesystem cooperative ownership", () => {
   test("live owner in another process still blocks acquisition", async () => {
     const p = await paths();
     const holder = Bun.spawn([process.execPath, "-e", `
-      import { acquireOwner } from "/home/example/Documents/opencode-goals/src/ownership.ts";
+      import { acquireOwner } from ${JSON.stringify(ownershipModuleURL)};
       const owner = await acquireOwner("/project", "", ${JSON.stringify(p.state)});
       await new Promise(() => {});
     `], { stdout: "ignore", stderr: "ignore" });

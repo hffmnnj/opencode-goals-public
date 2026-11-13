@@ -1,10 +1,8 @@
 # OpenCode V2 contract research
 
-Target verified on 2026-10-14: OpenCode **2.0.25**. The default shell `opencode` resolves to a separate V1 installation and must not be used for this plugin's V2 verification. V2 executable:
+Target verified on 2026-10-14: OpenCode **2.0.25**. The default shell `opencode` resolved to a separate V1 installation and must not be used for this plugin's V2 verification. The V2 release executable is installed under the V2 CLI release directory for the pinned version.
 
-`<private-path>`
-
-Initial direct-binary service discovery and OpenAPI reads succeeded but refer to a separate managed instance. The user's foreground V2 service is reached through `<private-path>` (edge 4107, actual server 4108); installation acceptance must use that wrapper, not the separately discovered managed service. A running-server OpenAPI snapshot is available locally at `<private-path>`.
+Initial direct-binary service discovery and OpenAPI reads succeeded but referred to a separate managed instance. The foreground V2 service was reached through the installed V2 launcher (loopback edge on an adjacent port, actual server on the configured loopback port); installation acceptance must use that launcher, not the separately discovered managed service. A running-server OpenAPI snapshot was retained privately for research.
 
 ## Primary documentation read
 

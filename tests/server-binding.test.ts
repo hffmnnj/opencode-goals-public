@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { chmod, mkdir, mkdtemp, rmdir, symlink, unlink, writeFile } from "node:fs/promises";
 import { createHash, randomUUID } from "node:crypto";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   discoverCurrentProcessLoopbackListeners,
@@ -21,13 +22,14 @@ function bindingEnv(): Record<string, string | undefined> {
   return {
     GOALS_BINDING_USER: fixtureUser,
     GOALS_BINDING_PASSWORD: fixtureEnvPassword,
-    XDG_STATE_HOME: "/var/tmp/example/opencode/goals-binding-unused",
+    XDG_STATE_HOME: join(tmpdir(), "goals-binding-unused"),
   };
 }
+const fixtureServicePath = join(tmpdir(), "goals-binding-state", "opencode", "service.json");
 
 describe("proc fixture discovery", () => {
   test("discovery_joinsOnlyOwnedLoopbackListenSockets", async () => {
-    const procRoot = await mkdtemp("/var/tmp/example/opencode/goals-binding-proc-");
+    const procRoot = await mkdtemp(join(tmpdir(), "goals-binding-proc-"));
     try {
       await mkdir(join(procRoot, "fd"), { recursive: true });
       await mkdir(join(procRoot, "net"), { recursive: true });
@@ -83,7 +85,7 @@ describe("proc fixture discovery", () => {
 
 describe("managed service binding", () => {
   test("managedService_matchingPidOverridesConfiguredEndpoint", () => {
-    const servicePath = "/var/tmp/example/opencode/goals-binding-state/opencode/service.json";
+    const servicePath = fixtureServicePath;
     const service = {
       path: servicePath,
       url: "http://127.0.0.1:4567",
@@ -103,7 +105,7 @@ describe("managed service binding", () => {
   });
 
   test("managedService_identityStableAcrossPidAndUrlChanges", () => {
-    const servicePath = "/var/tmp/example/opencode/goals-binding-state/opencode/service.json";
+    const servicePath = fixtureServicePath;
     const first = resolveServerBinding(api, bindingEnv(), 424242, {
       managedService: () => ({
         path: servicePath,
@@ -134,7 +136,7 @@ describe("managed service binding", () => {
     try {
       resolveServerBinding(api, bindingEnv(), 424242, {
         managedService: () => ({
-          path: "/var/tmp/example/opencode/goals-binding-state/opencode/service.json",
+          path: fixtureServicePath,
           url: "http://127.0.0.1:4567",
           pid: 999999,
           password: foreignPassword,
@@ -221,7 +223,7 @@ describe("service registration files", () => {
     state: string;
     pid: number;
   }> {
-    const state = await mkdtemp("/var/tmp/example/opencode/goals-binding-service-");
+    const state = await mkdtemp(join(tmpdir(), "goals-binding-service-"));
     const directory = join(state, "opencode");
     await mkdir(directory, { recursive: true, mode: 0o700 });
     await chmod(state, 0o700);
@@ -259,7 +261,7 @@ describe("service registration files", () => {
 
   test("serviceFile_onlyExact2032VersionAccepted", async () => {
     for (const version of ["2.0.25", "2.0.26", "2.0.31", "2.0.33", "2.0.32-rc.1", "2.0.32+build", "v2.0.32", "2.0", "latest", ""]) {
-      const state = await mkdtemp("/var/tmp/example/opencode/goals-binding-version-");
+      const state = await mkdtemp(join(tmpdir(), "goals-binding-version-"));
       try {
         const directory = join(state, "opencode");
         await mkdir(directory, { recursive: true, mode: 0o700 });
@@ -298,7 +300,7 @@ describe("service registration files", () => {
   });
 
   test("serviceFile_symlinkRejected", async () => {
-    const state = await mkdtemp("/var/tmp/example/opencode/goals-binding-symlink-");
+    const state = await mkdtemp(join(tmpdir(), "goals-binding-symlink-"));
     try {
       const directory = join(state, "opencode");
       await mkdir(directory, { recursive: true, mode: 0o700 });

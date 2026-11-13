@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Plugin } from "@opencode/plugin";
 import { mkdtemp, readdir } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { LoopbackBridge, USER_AGENT } from "../src/bridge.ts";
 import { RuntimeOptionsSchema } from "../src/options.ts";
@@ -11,6 +12,8 @@ import { createDegradedGoalRuntime, createGoalRuntime } from "../src/startup.ts"
 const options = RuntimeOptionsSchema.parse({ api: { baseURL: "http://127.0.0.1:4108", usernameEnv: "FIXTURE_USER", passwordEnv: "FIXTURE_PASSWORD" } });
 const credentials = { FIXTURE_USER: "fixture-user", FIXTURE_PASSWORD: "fixture-password-not-a-secret" };
 const info = { pid: 42, version: "2.0.32" };
+// Child processes must resolve the real ownership module regardless of the checkout location.
+const ownershipModuleURL = new URL("../src/ownership.ts", import.meta.url).href;
 const ownListener = { managedService: () => undefined, listeners: () => ["http://127.0.0.1:4108"] };
 function deferred() { let resolve!: () => void; const promise = new Promise<void>(r => { resolve = r; }); return { promise, resolve }; }
 function transport(handler: (url: URL, init: RequestInit) => Response | Promise<Response>): typeof fetch {
@@ -38,7 +41,7 @@ async function settle(pending: Promise<GoalRuntime>): Promise<{ runtime?: GoalRu
 
 describe("server-bound runtime startup", () => {
   test("configured identity verification finishes BEFORE any ownership filesystem access", async () => {
-    const stateHome = await mkdtemp("/var/tmp/example/opencode/goals-startup-order-");
+    const stateHome = await mkdtemp(join(tmpdir(), "goals-startup-order-"));
     const verifying = deferred(); const release = deferred(); let calls = 0;
     const bridge = new LoopbackBridge(options.api, transport(async (url, init) => {
       calls++;
@@ -64,7 +67,7 @@ describe("server-bound runtime startup", () => {
   });
 
   test("an unverified competing process cannot claim the valid server location lock", async () => {
-    const stateHome = await mkdtemp("/var/tmp/example/opencode/goals-startup-competing-");
+    const stateHome = await mkdtemp(join(tmpdir(), "goals-startup-competing-"));
     const verifying = deferred(); const release = deferred();
     const wrong = new LoopbackBridge(options.api, transport(async () => {
       verifying.resolve(); await release.promise; return Response.json(info);
@@ -95,7 +98,7 @@ describe("server-bound runtime startup", () => {
 
   for (const failure of ["credentials", "transport", "http", "shape", "version", "identity"] as const) {
     test(`explicit binding failure (${failure}) fails setup without claiming ownership`, async () => {
-      const stateHome = await mkdtemp("/var/tmp/example/opencode/goals-startup-unverified-");
+      const stateHome = await mkdtemp(join(tmpdir(), "goals-startup-unverified-"));
       const bridge = new LoopbackBridge(options.api, transport(() => {
         if (failure === "transport") throw new Error("Fixture transport unavailable");
         if (failure === "http") return new Response(null, { status: 401 });
@@ -113,7 +116,7 @@ describe("server-bound runtime startup", () => {
 
   test("only exact 2.0.32 version starts without claiming ownership", async () => {
     for (const version of ["2.0.25", "2.0.26", "2.0.31", "2.0.33", "2.0.32-rc.1", "2.0.32+build", "v2.0.32", "2.0", "latest", ""]) {
-      const stateHome = await mkdtemp("/var/tmp/example/opencode/goals-startup-version-");
+      const stateHome = await mkdtemp(join(tmpdir(), "goals-startup-version-"));
       const bridge = new LoopbackBridge(options.api, transport(() => Response.json({ pid: info.pid, version })), credentials, info.pid, ownListener);
       const result = await settle(createGoalRuntime(context(), options, bridge, stateHome));
       try {
@@ -124,7 +127,7 @@ describe("server-bound runtime startup", () => {
   });
 
   test("generic no-api startup requires no bridge/auth and supports native bookkeeping", async () => {
-    const stateHome = await mkdtemp("/var/tmp/example/opencode/goals-startup-generic-");
+    const stateHome = await mkdtemp(join(tmpdir(), "goals-startup-generic-"));
     let calls = 0;
     const bridge = new LoopbackBridge(undefined, transport(() => { calls++; throw new Error("No bridge should be used"); }), {});
     const runtime = await createGoalRuntime(context(), RuntimeOptionsSchema.parse({}), bridge, stateHome, {
@@ -143,7 +146,7 @@ describe("server-bound runtime startup", () => {
 
   test("degraded startup still loads bookkeeping when binding fails", async () => {
     const bridge = new LoopbackBridge(options.api, transport(() => { throw new Error("Fixture transport unavailable"); }), credentials, info.pid, ownListener);
-    const strict = await settle(createGoalRuntime(context(), options, bridge, await mkdtemp("/var/tmp/example/opencode/goals-startup-degraded-")));
+    const strict = await settle(createGoalRuntime(context(), options, bridge, await mkdtemp(join(tmpdir(), "goals-startup-degraded-"))));
     expect(strict.error).toMatchObject({ code: "transport" });
     const degraded = createDegradedGoalRuntime(context(), options, bridge);
     try {
@@ -156,9 +159,9 @@ describe("server-bound runtime startup", () => {
   });
 
   test("degraded startup still loads when another process holds the owner lock", async () => {
-    const stateHome = await mkdtemp("/var/tmp/example/opencode/goals-startup-degraded-owner-");
+    const stateHome = await mkdtemp(join(tmpdir(), "goals-startup-degraded-owner-"));
     const holder = Bun.spawn([process.execPath, "-e", `
-      import { acquireOwner } from "/home/example/Documents/opencode-goals/src/ownership.ts";
+      import { acquireOwner } from ${JSON.stringify(ownershipModuleURL)};
       await acquireOwner("/startup-fixture/project", "", ${JSON.stringify(stateHome)});
       await new Promise(() => {});
     `], { stdout: "ignore", stderr: "ignore" });

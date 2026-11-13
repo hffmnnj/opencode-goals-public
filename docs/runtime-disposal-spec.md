@@ -13,7 +13,7 @@ verified local repair. Live activation is explicitly prohibited by the user.
 - Known host log (verbatim stack fragment): `Failed to drain Session stack
   alive -> owned -> observed -> context -> SessionModelRequest.prepare`,
   with adjacent `watcher stopped` lines.
-- Active host at report time: V2 `2.0.32`, PID <historical-process>**.
+- Active host at report time: V2 `2.0.32`.
 - Current source path that produces the throw: `src/runtime.ts`
   `alive()` (`throw new GoalError("disposed", "Goal runtime is disposed")`),
   reached via `owned()` -> `observed()` -> `context()`; `src/index.ts`
@@ -80,8 +80,7 @@ verified local repair. Live activation is explicitly prohibited by the user.
    throws `GoalError` with code `disposed`.
 4. Focused disposal tests, type checking, relevant suite, and fresh build
    pass (verified in the linked evidence).
-5. Live activation remains deliberately unperformed under the user's instruction
-   “Don't activate/restart live.” Do not treat staging as live deployment.
+5. Live activation remains deliberately unperformed under the explicit instruction not to activate or restart live. Do not treat staging as live deployment.
 
 ## Out of scope
 
