@@ -1,8 +1,14 @@
 {
-  "name": "opencode-goals",
+  "name": "hffmnnj.goals",
   "version": "1.0.0",
-  "private": true,
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hffmnnj/opencode-goals.git"
+  },
   "exports": {
     ".": "./dist/index.js",
     "./rpc": "./src/rpc.ts"
@@ -11,8 +17,7 @@
     "index.ts",
     "dist/index.js",
     "src/**/*.ts",
-    "scripts/**/*.py",
-    "docs/**/*.md",
+    "assets/banner.png",
     "README.md"
   ],
   "engines": {
@@ -33,6 +38,7 @@
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "build": "bun build ./src/index.ts --outdir ./dist --target bun --external '@opencode/*' --external zod",
-    "check": "bun run typecheck && bun test && bun run build"
+    "check": "bun run typecheck && bun test && bun run build",
+    "prepack": "bun run build"
   }
 }
