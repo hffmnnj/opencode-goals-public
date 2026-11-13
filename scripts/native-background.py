@@ -3,6 +3,8 @@
 
 Uses a private source build, loopback scripted model, FIFO-controlled native shell
 and event-controlled native subagent. No sleep-based assertions or live providers.
+Requires OPENCODE_V2_BIN to point at the pinned 2.0.25 release binary; the
+live-config `opencodev2` wrapper is refused.
 Run: python3 scripts/native-background.py [--kind shell|child|both]
      python3 scripts/native-background.py --kind shell --dispose
      python3 scripts/native-background.py --kind child --original-fault
@@ -16,6 +18,7 @@ import pathlib
 import select
 import socket
 import subprocess
+import tempfile
 import threading
 import time
 import urllib.request
@@ -24,14 +27,25 @@ import urllib.parse
 import uuid
 
 PROJECT = pathlib.Path(__file__).resolve().parent.parent
-BINARY = '/home/example/.local/share/opencode-v2-cli/releases/2.0.25/node_modules/@opencode/cli/bin/opencode.exe'
+
+
+def resolve_binary():
+    binary = (os.environ.get('OPENCODE_V2_BIN') or '').strip()
+    if not binary:
+        raise RuntimeError('Set OPENCODE_V2_BIN to the pinned 2.0.25 V2 release binary; refusing to start acceptance')
+    if pathlib.Path(binary).name == 'opencodev2':
+        raise RuntimeError('Refusing to spawn from the live-config wrapper; set OPENCODE_V2_BIN to the pinned 2.0.25 release binary')
+    return binary
+
+
+BINARY = resolve_binary()
 args = argparse.ArgumentParser()
 args.add_argument('--kind', choices=['shell', 'child', 'both'], default='both')
 args.add_argument('--original-fault', action='store_true', help='Build a private source copy with the original missing-background-check fault')
 args.add_argument('--dispose', action='store_true', help='Exercise disposal in a fresh host; requires --kind shell or child')
 options = args.parse_args()
 assert not options.dispose or options.kind != 'both', '--dispose requires one kind per private host'
-ROOT = pathlib.Path('/var/tmp/example/opencode/goals-background-' + uuid.uuid4().hex)
+ROOT = pathlib.Path(tempfile.gettempdir()) / ('goals-background-' + uuid.uuid4().hex)
 for name in ['home', 'config', 'data', 'cache', 'state', 'workspace', 'plugin']:
     (ROOT / name).mkdir(parents=True, exist_ok=True)
 

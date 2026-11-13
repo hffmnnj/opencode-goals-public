@@ -2,7 +2,7 @@
 
 ## Provenance
 
-Upstream: [openai/codex](https://github.com/openai/codex). Source pinned to commit **`c6327eba6a5a31304c289f2121cc74f56f9a441b`**, dated 2026-10-14T14:28:18Z. An independent explorer verified the SHA with both `git ls-remote ... HEAD` and the GitHub commit API, then fetched the files at that SHA. Local source snapshot: `<private-path>`.
+Upstream: [openai/codex](https://github.com/openai/codex). Source pinned to commit **`c6327eba6a5a31304c289f2121cc74f56f9a441b`**, dated 2026-10-14T14:28:18Z. An independent explorer verified the SHA with both `git ls-remote ... HEAD` and the GitHub commit API, then fetched the files at that SHA. A local source snapshot was retained privately for line inspection.
 
 Initial researcher reads used `main` and some outputs were truncated. Those were research leads, not final evidence. The pinned second pass inspected the complete continuation path, current migrations and behavioral tests. The coordinator separately reopened runtime lines 400–579, accounting 551–575, the full continuation template, and the current migration.
 
@@ -12,11 +12,11 @@ All line references below refer to the pinned revision, not a moving branch.
 
 The pinned upstream goal layer has **no numeric turn cap or time cap**. Its goal state stores elapsed time for accounting, not as a time budget. The token budget is optional: [`GoalsToml.max_goal_token_budget`](https://github.com/openai/codex/blob/c6327eba6a5a31304c289f2121cc74f56f9a441b/codex-rs/config/src/config_toml.rs#L749-L754) is an `Option<NonZeroU64>` in a default-derived configuration, and [`handle_create`](https://github.com/openai/codex/blob/c6327eba6a5a31304c289f2121cc74f56f9a441b/codex-rs/ext/goal/src/tool.rs#L204-L214) falls back from an omitted request budget to that optional host setting. With neither set, there is no goal token cap. This describes the unconfigured upstream goal layer, not hosted-client overrides, account quotas or provider rate limits.
 
-After the user requested larger allowances, this plugin deliberately retains finite defaults: **200 admissions / 24 active hours / 20,000,000 observed tokens per new goal**, and **1,000 admissions / 7 active days / 100,000,000 observed tokens per new session**. These are our chosen safeguards, not Codex defaults. Previously persisted tighter goal/session ceilings and consumed usage are not migrated upward.
+After the user requested larger allowances, this plugin deliberately retained finite defaults: **200 admissions / 24 active hours / 20,000,000 observed tokens per new goal**, and **1,000 admissions / 7 active days / 100,000,000 observed tokens per new session**. These are our chosen safeguards, not Codex defaults. Previously persisted tighter goal/session ceilings and consumed usage were not migrated upward.
 
 The token numbers are not directly comparable. Codex subtracts cached input and adds nonnegative output (`accounting.rs:570–574`, linked below); this plugin counts the V2 host's five disjoint normalized categories, including cache reads/writes and reasoning. Repeated large cached prompts can therefore consume our observed-token budget much faster than Codex's goal-token budget. Codex's consecutive-three anti-spin thresholds also use different semantics from our substantive-progress check; increasing budgets does not change our no-progress default of two.
 
-For this comparison, the coordinator independently reopened the pinned configuration source (downloaded with the required User-Agent), creation fallback and token-accounting passages. The original sparse source snapshot did not include the configuration file; the additional local copy is `<private-path>`. No upstream Rust tests were run.
+For this comparison, the coordinator independently reopened the pinned configuration source (downloaded with the required User-Agent), creation fallback and token-accounting passages. The additional local copy was retained privately. No upstream Rust tests were run.
 
 ## Findings and adopted patterns
 
@@ -62,7 +62,7 @@ Adopt these principles in original plugin policy text. Add schema-enforced crite
 
 [`spec.rs:46–48,62–83`](https://github.com/openai/codex/blob/c6327eba6a5a31304c289f2121cc74f56f9a441b/codex-rs/ext/goal/src/spec.rs#L46-L83) requires explicit user/system request for creation and user/system control over resume and system-limit transitions. `tool.rs:247–260` enforces the limited model status set.
 
-**Do not copy these gates.** the user explicitly requested agents be able to create, maintain and update goals without a user command or separate approval. This plugin therefore allows autonomous bookkeeping and ordinary lifecycle management while keeping trusted ceilings, restart/ambiguous-dispatch recovery and underlying OpenCode permissions separate. An agent must not reset consumed allowance or raise its configured maximums by replacing a goal.
+**Do not copy these gates.** The user explicitly requested agents be able to create, maintain and update goals without a user command or separate approval. This plugin therefore allows autonomous bookkeeping and ordinary lifecycle management while keeping trusted ceilings, restart/ambiguous-dispatch recovery and underlying OpenCode permissions separate. An agent must not reset consumed allowance or raise its configured maximums by replacing a goal.
 
 Codex's repeated-three blocker audit is also not copied as a requirement to waste work on a known authorization blocker. This plugin may stop immediately for a concrete safety/permission/runtime failure.
 

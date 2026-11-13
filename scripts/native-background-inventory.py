@@ -3,6 +3,8 @@
 
 No prompts, model calls, production configuration, or root dist writes. Retains
 raw private one/128/129-child inventory responses plus real bridge results.
+Requires OPENCODE_V2_BIN to point at the pinned 2.0.25 release binary; the
+live-config `opencodev2` wrapper is refused.
 Run: python3 scripts/native-background-inventory.py
 """
 import base64
@@ -12,14 +14,26 @@ import pathlib
 import select
 import socket
 import subprocess
+import tempfile
 import time
 import urllib.parse
 import urllib.request
 import uuid
 
 PROJECT = pathlib.Path(__file__).resolve().parent.parent
-BINARY = '/home/example/.local/share/opencode-v2-cli/releases/2.0.25/node_modules/@opencode/cli/bin/opencode.exe'
-ROOT = pathlib.Path('/var/tmp/example/opencode/goals-background-inventory-' + uuid.uuid4().hex)
+
+
+def resolve_binary():
+    binary = (os.environ.get('OPENCODE_V2_BIN') or '').strip()
+    if not binary:
+        raise RuntimeError('Set OPENCODE_V2_BIN to the pinned 2.0.25 V2 release binary; refusing to start acceptance')
+    if pathlib.Path(binary).name == 'opencodev2':
+        raise RuntimeError('Refusing to spawn from the live-config wrapper; set OPENCODE_V2_BIN to the pinned 2.0.25 release binary')
+    return binary
+
+
+BINARY = resolve_binary()
+ROOT = pathlib.Path(tempfile.gettempdir()) / ('goals-background-inventory-' + uuid.uuid4().hex)
 for name in ['home', 'config', 'data', 'cache', 'state', 'workspace']:
     (ROOT / name).mkdir(parents=True, exist_ok=True)
 env = {key: value for key, value in os.environ.items()

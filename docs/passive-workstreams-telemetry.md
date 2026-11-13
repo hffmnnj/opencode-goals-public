@@ -21,7 +21,7 @@ request, source of authorization, or completion percentage.
 Only this checkout's source, tests and documentation may change. Do not overwrite
 `dist/index.js` or root `index.ts`, activate/reload a plugin, inspect live goals,
 change owners, restart a service, or change global configuration. Stage the bundle
-under `<private-path>` for coordinator review.
+in an external staging directory for coordinator review.
 
 ## Boundary and invariants
 
@@ -147,19 +147,17 @@ local verification completed; staged candidate only, not activated.
   assertion: status changed to paused/restart and content/envelope revision
   advanced. Production source was never mutated for this check.
 - External build command: `bun build ./src/index.ts --outfile
-  <private-path> --target bun
-  --external '@opencode/*' --external zod`. Bundle SHA256:
-  `500b3bcbd5cdb48d157682273b1a6fbe9c8defd282b079b6d4db18218349a074`.
-- Live `dist/index.js` remains SHA256
-  `aa6b6c9b3836bce02348f486d73b686e9439f345f908c64e878ed6874dad5d2a`;
-  root `index.ts` remains SHA256
-  `53c8cb444b9a897ea0315b219121ea900f49ce32dca290337c9c3ddb628163fb`.
-- Native private probe **blocked before execution**: the existing
-  `plugin-hot-activate --mode probe` Block declares `effects = "external"`, which
-  `.blocks/config.toml` does not allow. No policy change, direct-script bypass,
-  live call, native fixture launch, reload, restart, activation or owner change
-  was performed. Real 2.0.25 HTTP integration remains **unverified**; registration
-  and the pinned portable schemas are covered locally.
+  <staging>/candidate/index.js --target bun
+  --external '@opencode/*' --external zod`. The bundle hash was recorded in the
+  staging evidence.
+- Live `dist/index.js` and root `index.ts` hashes were checked before and after;
+  both live entrypoints remained unchanged.
+- Native private probe **blocked before execution**: the existing activation helper
+  declared an external-effects requirement that the local policy gate did not
+  allow. No policy change, direct-script bypass, live call, native fixture launch,
+  reload, restart, activation or owner change was performed. Real 2.0.25 HTTP
+  integration remains **unverified**; registration and the pinned portable schemas
+  are covered locally.
 
 Freshness limitation: without forbidden native session reads, snapshot cannot
 discover an unobserved session relocation or update live token/time observations.

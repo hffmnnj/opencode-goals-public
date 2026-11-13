@@ -7,10 +7,9 @@ No scripted provider is configured: this harness intentionally runs with
 automation off (autoContinue false) so restart assertions verify no-replay
 without racing autonomous model work. Automatic restart recovery with
 autoContinue on is validated separately in scripts/native-recovery.py --case
-restart. Adapted from the original isolated lifecycle harness under
-/var/tmp/example/opencode/goals-native-harness/. This version verifies every
-public RPC operation, incremental append, passive command variants, persistence
-and safe restart/reload using private configuration and storage.
+restart. This version verifies every public RPC operation, incremental append,
+passive command variants, persistence and safe restart/reload using private
+configuration and storage.
 
 Usage:
   python3 scripts/native-lifecycle.py
@@ -20,9 +19,10 @@ Environment:
   GOALS_EXPECTED_VERSION exact V2 version to accept (only 2.0.32;
                      default 2.0.32). Unsupported values refuse
                      before any server is spawned.
-  OPENCODE_V2_BIN   pinned expected-version server binary (default: known release
-                     path for GOALS_EXPECTED_VERSION). Never point this at the
-                     default `opencode` (V1) binary or the `opencodev2` live-config wrapper.
+  OPENCODE_V2_BIN   required pinned expected-version server binary (no default;
+                     missing values fail before any server starts). Never point
+                     this at the default `opencode` (V1) binary or the
+                     `opencodev2` live-config wrapper.
   GOALS_PLUGIN_PATH override the plugin directory under test (default: repo root).
   GOALS_SMOKE_ROOT  override the artifact root.
   GOALS_WATCHER_TEST=1 also exercise watched-config reload.
@@ -34,6 +34,7 @@ import pathlib
 import select
 import socket
 import subprocess
+import tempfile
 import threading
 import time
 import urllib.error
@@ -52,7 +53,6 @@ def _expected_version():
 
 
 PINNED_VERSION = _expected_version()
-PINNED_BINARY = '/home/example/.local/share/opencode-v2-cli/releases/' + PINNED_VERSION + '/node_modules/@opencode/cli/bin/opencode.exe'
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 # Secret/proxy hygiene: inherit the operator shell for OS and toolchain needs,
@@ -75,7 +75,9 @@ def scrubbed_environ():
     return base
 
 def resolve_binary():
-    binary = os.environ.get('OPENCODE_V2_BIN') or PINNED_BINARY
+    binary = (os.environ.get('OPENCODE_V2_BIN') or '').strip()
+    if not binary:
+        raise RuntimeError(f'Set OPENCODE_V2_BIN to the pinned V2 {PINNED_VERSION} release binary; refusing to run acceptance')
     if pathlib.Path(binary).name == 'opencodev2':
         raise RuntimeError(f'Refusing to spawn from the live-config wrapper; set OPENCODE_V2_BIN to the pinned {PINNED_VERSION} release binary')
     try:
@@ -87,7 +89,8 @@ def resolve_binary():
         raise RuntimeError(f'Binary {binary} did not report pinned V2 {PINNED_VERSION}; refusing to run acceptance')
     return binary
 
-ROOT = pathlib.Path(os.environ.get('GOALS_SMOKE_ROOT') or ('/var/tmp/example/opencode/goals-native-lifecycle/' + uuid.uuid4().hex))
+ROOT = pathlib.Path(os.environ.get('GOALS_SMOKE_ROOT') or
+                    pathlib.Path(tempfile.gettempdir()) / ('goals-native-lifecycle-' + uuid.uuid4().hex))
 for name in ['config', 'data', 'cache', 'state', 'workspace']:
     (ROOT / name).mkdir(parents=True, exist_ok=True)
 with socket.socket() as listener:

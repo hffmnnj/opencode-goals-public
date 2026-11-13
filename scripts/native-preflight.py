@@ -2,10 +2,9 @@
 """Isolated native acceptance: goal tools, guarded commands, automatic continuation.
 
 Spawns a private real OpenCode V2 host with a scripted loopback model fixture;
-stdlib only. Coordinator-owned originals live under
-/var/tmp/example/opencode/goals-native-harness/; this copy adapts plugin/binary
-paths and hardens config and environment handling. The scripted provider uses
-real Code Mode discovery/execution while preserving native lifecycle boundaries.
+stdlib only. Plugin and binary paths are explicit, and config/environment
+handling stays isolated. The scripted provider uses real Code Mode
+discovery/execution while preserving native lifecycle boundaries.
 
 Usage:
   python3 scripts/native-preflight.py --goals
@@ -16,14 +15,15 @@ Environment:
   GOALS_EXPECTED_VERSION exact V2 version to accept (only 2.0.32;
                      default 2.0.32). Unsupported values refuse
                      before any server is spawned.
-  OPENCODE_V2_BIN   pinned expected-version server binary (default: known release path).
-                    Never point this at the default `opencode` (V1) binary or
-                    the `opencodev2` live-config wrapper.
+  OPENCODE_V2_BIN   required pinned expected-version server binary (no default;
+                    missing values fail before any server starts). Never point
+                    this at the default `opencode` (V1) binary or the
+                    `opencodev2` live-config wrapper.
   GOALS_PLUGIN_PATH override the plugin directory under test (default: repo root).
   GOALS_SMOKE_ROOT  override the artifact root.
   GOALS_SMOKE_TIMEOUT seconds to wait for terminal outcomes (default 60).
 """
-import base64, http.server, json, os, pathlib, re, select, socket, subprocess, sys, threading, time, urllib.request, urllib.error, uuid
+import base64, http.server, json, os, pathlib, re, select, socket, subprocess, sys, tempfile, threading, time, urllib.request, urllib.error, uuid
 
 SUPPORTED_VERSIONS = ('2.0.32',)
 
@@ -37,7 +37,6 @@ def _expected_version():
 
 
 PINNED_VERSION = _expected_version()
-PINNED_BINARY = '/home/example/.local/share/opencode-v2-cli/releases/' + PINNED_VERSION + '/node_modules/@opencode/cli/bin/opencode.exe'
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 COMMAND = '--command' in sys.argv
@@ -69,7 +68,9 @@ def scrubbed_environ():
     return base
 
 def resolve_binary():
-    binary = os.environ.get('OPENCODE_V2_BIN') or PINNED_BINARY
+    binary = (os.environ.get('OPENCODE_V2_BIN') or '').strip()
+    if not binary:
+        raise RuntimeError(f'Set OPENCODE_V2_BIN to the pinned V2 {PINNED_VERSION} release binary; refusing to run acceptance')
     if pathlib.Path(binary).name == 'opencodev2':
         raise RuntimeError(f'Refusing to spawn from the live-config wrapper; set OPENCODE_V2_BIN to the pinned {PINNED_VERSION} release binary')
     try:
@@ -81,7 +82,8 @@ def resolve_binary():
         raise RuntimeError(f'Binary {binary} did not report pinned V2 {PINNED_VERSION}; refusing to run acceptance')
     return binary
 
-ROOT = pathlib.Path(os.environ.get('GOALS_SMOKE_ROOT') or ('/var/tmp/example/opencode/goals-native-preflight/' + uuid.uuid4().hex))
+ROOT = pathlib.Path(os.environ.get('GOALS_SMOKE_ROOT') or
+                    pathlib.Path(tempfile.gettempdir()) / ('goals-native-preflight-' + uuid.uuid4().hex))
 for name in ['config', 'data', 'cache', 'state', 'workspace']:
     (ROOT / name).mkdir(parents=True, exist_ok=True)
 calls = []
