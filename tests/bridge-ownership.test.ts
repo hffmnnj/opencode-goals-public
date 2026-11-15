@@ -256,15 +256,17 @@ describe("same-server bridge", () => {
     expect(paths).toEqual(["/api/info"]);
   });
 
-  test("only exact 2.0.32 version is accepted before privileged session reads", async () => {
-    for (const version of ["2.0.25", "2.0.26", "2.0.31", "2.0.33", "2.0.32-rc.1", "2.0.32+build", "v2.0.32", "2.0.32 ", "2.0", "latest", ""]) {
+  test("only explicitly supported exact versions are accepted before privileged session reads", async () => {
+    for (const version of ["2.0.25", "2.0.26", "2.0.31", "2.0.33", "2.2.0", "2.2.2", "2.0.32-rc.1", "2.0.32+build", "2.2.1-rc.1", "2.2.1+build", "v2.0.32", "v2.2.1", "2.0.32 ", "2.2.1 ", "2.2", "2.0", "latest", ""]) {
       const paths: string[] = [];
       const bridge = new LoopbackBridge(api, transport(url => { paths.push(url.pathname); return Response.json({ pid: 42, version }); }), credentials, 42, ownConfiguredListener);
       await expect(bridge.inspect("ses_one")).rejects.toMatchObject({ code: "version" });
       expect(paths).toEqual(["/api/info"]);
     }
-    const verified = new LoopbackBridge(api, transport(url => defaultResponse(url)), credentials, 42, ownConfiguredListener);
-    expect(await verified.inspect("ses_one")).toEqual({ active: false, inbox: [], forms: [] });
+    for (const version of ["2.0.32", "2.2.1"]) {
+      const verified = new LoopbackBridge(api, transport(url => url.pathname === "/api/info" ? Response.json({ pid: 42, version }) : defaultResponse(url)), credentials, 42, ownConfiguredListener);
+      expect(await verified.inspect("ses_one")).toEqual({ active: false, inbox: [], forms: [] });
+    }
   });
 
   test("missing credentials, malformed reads and HTTP errors have no unsafe fallback or secret diagnostics", async () => {

@@ -219,7 +219,7 @@ describe("discovered listener binding", () => {
 });
 
 describe("service registration files", () => {
-  async function safeState(password = "fixture-service-password-not-a-secret"): Promise<{
+  async function safeState(password = "fixture-service-password-not-a-secret", version = "2.0.32"): Promise<{
     state: string;
     pid: number;
   }> {
@@ -233,7 +233,7 @@ describe("service registration files", () => {
       join(directory, "service.json"),
       JSON.stringify({
         id: randomUUID(),
-        version: "2.0.32",
+        version,
         url: "http://127.0.0.1:4567",
         pid,
         password,
@@ -259,8 +259,17 @@ describe("service registration files", () => {
     }
   });
 
-  test("serviceFile_onlyExact2032VersionAccepted", async () => {
-    for (const version of ["2.0.25", "2.0.26", "2.0.31", "2.0.33", "2.0.32-rc.1", "2.0.32+build", "v2.0.32", "2.0", "latest", ""]) {
+  test("serviceFile_onlyExplicitExactVersionsAccepted", async () => {
+    for (const version of ["2.0.32", "2.2.1"]) {
+      const { state, pid } = await safeState("fixture-service-password-not-a-secret", version);
+      try { expect(readManagedServiceRegistration(state, pid)?.pid).toBe(pid); }
+      finally {
+        await unlink(join(state, "opencode", "service.json"));
+        await rmdir(join(state, "opencode"));
+        await rmdir(state);
+      }
+    }
+    for (const version of ["2.0.25", "2.0.26", "2.0.31", "2.0.33", "2.2.0", "2.2.2", "2.0.32-rc.1", "2.0.32+build", "2.2.1-rc.1", "2.2.1+build", "v2.0.32", "v2.2.1", "2.2.1 ", "2.0", "2.2", "latest", ""]) {
       const state = await mkdtemp(join(tmpdir(), "goals-binding-version-"));
       try {
         const directory = join(state, "opencode");

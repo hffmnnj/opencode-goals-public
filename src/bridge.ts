@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { SUPPORTED_OPENCODE_VERSION } from "./compatibility.ts";
+import { isSupportedOpenCodeVersion } from "./compatibility.ts";
 import type { RuntimeOptions } from "./options.ts";
 import { LoopbackURLSchema } from "./options.ts";
 import { resolveServerBinding, type ServerBinding, type ServerBindingDependencies } from "./server-binding.ts";
@@ -82,8 +82,7 @@ export class LoopbackBridge implements ServerBridge {
     this.verified = false;
     const info = InfoSchema.parse(await this.request("/api/info", InfoSchema, signal));
     if (info.pid !== this.pid) throw new BridgeError("identity");
-    // Deliberately pin the verified patch contract; widen only after another compatibility audit.
-    if (info.version !== SUPPORTED_OPENCODE_VERSION) throw new BridgeError("version");
+    if (!isSupportedOpenCodeVersion(info.version)) throw new BridgeError("version");
     this.verified = true;
   }
   serverIdentity(): string {

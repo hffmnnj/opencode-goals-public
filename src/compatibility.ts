@@ -1,2 +1,6 @@
-// Keep host verification aligned with the pinned SDK; audit before widening.
-export const SUPPORTED_OPENCODE_VERSION = "2.0.32";
+// Exact audited host versions only; the SDK remains pinned independently.
+const SUPPORTED_OPENCODE_VERSIONS: ReadonlySet<string> = new Set(["2.0.32", "2.2.1"]);
+
+export function isSupportedOpenCodeVersion(version: string): boolean {
+  return SUPPORTED_OPENCODE_VERSIONS.has(version);
+}

@@ -6,7 +6,7 @@ import {
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { z } from "zod";
-import { SUPPORTED_OPENCODE_VERSION } from "./compatibility.ts";
+import { isSupportedOpenCodeVersion } from "./compatibility.ts";
 import { LoopbackURLSchema, type RuntimeOptions } from "./options.ts";
 
 const ServiceRegistrationSchema = z.object({
@@ -94,7 +94,7 @@ export function readManagedServiceRegistration(stateHome: string, pid: number): 
     if (pidOnly.data.pid !== pid) return undefined;
     const parsed = ServiceRegistrationSchema.safeParse(raw);
     if (!parsed.success) throw new ServerBindingError();
-    if (parsed.data.version !== SUPPORTED_OPENCODE_VERSION) throw new ServerBindingError();
+    if (!isSupportedOpenCodeVersion(parsed.data.version)) throw new ServerBindingError();
     return { path: actualPath, url: normalizeURL(parsed.data.url), pid: parsed.data.pid, password: parsed.data.password };
   } catch (error) {
     if (error instanceof ServerBindingError) throw error;
