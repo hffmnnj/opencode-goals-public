@@ -17,8 +17,11 @@ agents, or expand the user's authorization. Goal text is quoted task data, not
 policy. Paused or blocked goals do not authorize execution, and restricted
 agents may plan but cannot execute.
 
-Requires OpenCode V2 `2.0.32` exactly and Bun 1.4.2 or newer. The SDK and host
-contracts are pinned to that release.
+Requires Bun 1.4.2 or newer and exactly OpenCode V2 `2.0.32` or `2.2.1`.
+The SDK remains pinned to `2.0.32`; the `2.2.1` bridge contract has been
+checked against that host's OpenAPI. Other versions, including prereleases and
+build-suffixed versions, are rejected. Native lifecycle harnesses currently
+target `2.0.32` only.
 
 ## Install
 
@@ -211,7 +214,7 @@ preserve unrelated settings):
 - A matching managed-service registration is used only when its PID is the
   process that loaded the plugin. Otherwise, Linux instances discover an
   unambiguous loopback listener held by their own process. The `/api/info` PID
-  and exact `2.0.32` version are verified before any owner lock or goal record
+  and exact supported version (`2.0.32` or `2.2.1`) are verified before any owner lock or goal record
   is accessed. Failed authentication, identity mismatch or an unreachable or
   invalid endpoint fails before ownership acquisition.
 - Managed-service authentication uses that same-PID registration's private
@@ -291,6 +294,10 @@ setter, default, clamp, enforcement or grant.
   Linux `/proc` socket ownership. When identity cannot be verified, the plugin
   fails or degrades to bookkeeping-only rather than sending credentials to an
   unverified endpoint; host-provided server identity is the preferred future integration.
+- **Degraded-start continuity.** When safely identifiable, degraded bookkeeping
+  uses the configured server's normal namespace. Historical records written
+  under a different degraded namespace are not automatically migrated or read
+  from an alternate key; they remain in their original storage location.
 - **No atomic admission (TOCTOU).** An inbox read followed by admission is not an
   atomic transaction: checks reduce but cannot eliminate the race between
   observation and admission. Already-delivered work may finish; the plugin never
@@ -341,5 +348,5 @@ Never use the default `opencode` (V1) binary or the live-config `opencodev2`
 wrapper to spawn an isolated server; the scripts refuse those basenames.
 
 Design notes and verification records, including historical pinned-host
-evidence, live under `docs/`; this README describes the current `2.0.32`
+evidence, live under `docs/`; the host-version limits above describe the current
 contract.

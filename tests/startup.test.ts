@@ -158,6 +158,40 @@ describe("server-bound runtime startup", () => {
     } finally { await degraded.dispose(); }
   });
 
+  for (const mode of ["configured single listener", "configured multiple listeners", "managed service"] as const) {
+    test(`degraded bookkeeping remains visible after healthy startup with ${mode}`, async () => {
+      const ctx = context();
+      const stateHome = await mkdtemp(join(tmpdir(), "goals-startup-continuity-"));
+      const dependencies = {
+        listeners: () => mode === "configured multiple listeners"
+          ? ["http://127.0.0.1:4108", "http://127.0.0.1:4567"]
+          : ["http://127.0.0.1:4108"],
+        managedService: (_stateHome: string, pid: number) => mode === "managed service"
+          ? { path: "/fixture/opencode/service.json", url: "http://127.0.0.1:4108", pid, password: "fixture-service-password" }
+          : undefined,
+      };
+      let version = "2.0.31";
+      const bridge = new LoopbackBridge(options.api, transport(() => Response.json({ pid: info.pid, version })), credentials, info.pid, dependencies);
+      const failed = await settle(createGoalRuntime(ctx, options, bridge, stateHome, dependencies));
+      expect(failed.error).toMatchObject({ code: "version" });
+      const degraded = createDegradedGoalRuntime(ctx, options, bridge, dependencies);
+      const created = await degraded.call("create", "ses_continuity", {
+        objective: "Preserve degraded bookkeeping", criteria: [{ id: "verified", description: "Observe the same goal after startup" }],
+      }, { kind: "agent", agent: "build" });
+      expect(created).toMatchObject({ ok: true, current: { objective: "Preserve degraded bookkeeping" } });
+      const goalId = created.ok ? created.current?.id : undefined;
+      expect(goalId).toBeDefined();
+      await degraded.dispose();
+
+      version = "2.2.1";
+      const healthy = await createGoalRuntime(ctx, options, bridge, stateHome, dependencies);
+      try {
+        const result = await healthy.call("get", "ses_continuity", {}, { kind: "agent", agent: "build" });
+        expect(result).toMatchObject({ ok: true, current: { id: goalId, objective: "Preserve degraded bookkeeping" } });
+      } finally { await healthy.dispose(); }
+    });
+  }
+
   test("degraded startup still loads when another process holds the owner lock", async () => {
     const stateHome = await mkdtemp(join(tmpdir(), "goals-startup-degraded-owner-"));
     const holder = Bun.spawn([process.execPath, "-e", `

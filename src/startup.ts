@@ -36,7 +36,8 @@ export async function createGoalRuntime(
  * bookkeeping) with automation disabled: observation stays disabled in setup,
  * so no scheduling occurs and bridge failures only mark diagnostics.
  * Storage uses the verified bridge identity when available, otherwise a
- * best-effort process-scoped namespace, otherwise legacy sharing.
+ * safely resolved configured identity, then a best-effort process-scoped
+ * namespace, otherwise legacy sharing.
  */
 export function createDegradedGoalRuntime(
   ctx: Plugin.Context, options: RuntimeOptions, bridge: ServerBridge,
@@ -48,9 +49,14 @@ export function createDegradedGoalRuntime(
     if (identity !== "legacy") namespace = identity;
   } catch {
     try {
-      namespace = resolveServerNamespace(undefined, process.env, process.pid, bindingDependencies);
+      const identity = resolveServerNamespace(options.api, process.env, process.pid, bindingDependencies);
+      if (identity !== "legacy") namespace = identity;
     } catch {
-      namespace = undefined;
+      try {
+        namespace = resolveServerNamespace(undefined, process.env, process.pid, bindingDependencies);
+      } catch {
+        namespace = undefined;
+      }
     }
   }
   const owner = createStandbyOwner();
